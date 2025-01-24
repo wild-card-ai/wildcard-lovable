@@ -29,4 +29,4 @@ pnpm install
 pnpm dev
 ```
 
-Note: Ensure the Go backend is running and configured with Stripe API keys.
+Note: Ensure the Go backend is running and configured with Stripe API keys. 
