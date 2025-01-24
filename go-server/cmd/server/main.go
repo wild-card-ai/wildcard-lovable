@@ -3,11 +3,12 @@ package main
 import (
 	"log"
 	"net/http"
+
 	"github.com/wildcard-lovable/go-server/internal/config"
 	"github.com/wildcard-lovable/go-server/internal/handlers"
 	"github.com/wildcard-lovable/go-server/internal/middleware"
 	"github.com/wildcard-lovable/go-server/internal/services"
-	"github.com/wildcard-lovable/go-server/pkg/stripe"
+	"github.com/wildcard-lovable/go-server/pkg/wildcard/integrations/stripe"
 )
 
 func main() {
@@ -35,4 +36,4 @@ func main() {
 	if err := http.ListenAndServe(":"+cfg.Port, nil); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
-} 
+}

@@ -62,6 +62,7 @@ export const useChat = (sessionId: string) => {
             ...prev,
             status: null,
             error: null,
+            isProcessing: false,
             messages: [...prev.messages, {
               id: uuidv4(),
               type: 'assistant',
@@ -97,14 +98,23 @@ export const useChat = (sessionId: string) => {
           if (!line.trim()) continue
           
           const event = parseSSELine(line)
-          if (event) {
+          if (event && event.data) {
             await handleEventUpdate(event.eventType, event.data)
           }
         }
       }
     } catch (e) {
       console.error('Error processing stream:', e)
+      // Handle stream disconnection error
+      setState(prev => ({
+        ...prev,
+        error: 'Connection lost. Please try again.',
+        status: null,
+        isProcessing: false
+      }))
       throw e
+    } finally {
+      reader.cancel() // Ensure reader is properly closed
     }
   }, [handleEventUpdate])
 
@@ -127,7 +137,10 @@ export const useChat = (sessionId: string) => {
       const response = await fetch(`${API_URL}/process-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, sessionId })
+        body: JSON.stringify({ 
+          message: content, 
+          user_id: sessionId
+        })
       })
 
       if (!response.ok) throw new Error('Failed to process message')

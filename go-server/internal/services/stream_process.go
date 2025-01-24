@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/wildcard-lovable/go-server/internal/models"
@@ -72,7 +73,7 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 		return
 	}
 
-	// Step 3: Process with Wildcard to get the Stripe action to execute
+	// Step 3: Process with Wildcard to get the action to execute
 	currentMessage := message
 	for {
 		send(updates, EventProgress, map[string]interface{}{
@@ -85,34 +86,70 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 		}
 
 		switch resp.Event {
-		case "EXEC":
-			// Step 4: Execute the Stripe function since we have an available action
-			result, err := p.wildcardClient.(*wildcard.StripeClient).handleStripeExec(resp.Data)
-			if handleError(updates, "Failed to execute Stripe function", err) {
-				return
+		case wildcard.EventExec:
+			// Step 4: Execute the function since we have an available action
+			result, _ := p.wildcardClient.HandleExecEvent(resp.Data, resp.API)
+
+			if !result.Success {
+				handleError(updates, "Failed to execute function", fmt.Errorf("function execution failed"))
+				currentMessage = fmt.Sprintf("Failed to execute function '%s'. Received Response: %v", resp.Data["name"], result.Error)
+				continue
 			}
 
 			send(updates, EventProgress, map[string]interface{}{
-				"message": "Stripe function executed successfully",
-				"result":  result,
+				"message": "Function executed successfully",
+				"result":  result.Data,
 			})
-			currentMessage = fmt.Sprintf("%v", result.Data)
 
-		case "STOP":
+			// Marshal the data into JSON and add prefix with function name and response
+			dataBytes, err := json.Marshal(result.Data)
+			if err != nil {
+				// Fallback: just use fmt.Sprintf
+				currentMessage = fmt.Sprintf("Successfully executed function '%s'. Received Response: %v", resp.Data["name"], result.Data)
+			} else {
+				currentMessage = fmt.Sprintf("Successfully executed function '%s'. Received Response: %s", resp.Data["name"], string(dataBytes))
+			}
+
+		case wildcard.EventStop:
 			wildcardResp, err := p.wildcardClient.HandleResponse(resp)
 			if handleError(updates, "Failed to handle Wildcard response", err) {
 				return
 			}
-			send(updates, EventComplete, wildcardResp.Data)
+			data, ok := wildcardResp.Data.(map[string]interface{})
+			if !ok {
+				handleError(updates, "Invalid response data format", fmt.Errorf("expected map[string]interface{}, got %T", wildcardResp.Data))
+				return
+			}
+
+			// Send progress update that we're generating a summary
+			send(updates, EventProgress, map[string]interface{}{
+				"message": "Generating summary of actions taken...",
+			})
+
+			// Collect all relevant information for OpenAI
+			summaryContext := fmt.Sprintf("User request: %s\nAction results: %v", message, data)
+
+			// Get OpenAI to generate a user-friendly summary
+			summary, err := p.openaiService.GenerateSummary(context.Background(), summaryContext)
+			if err != nil {
+				handleError(updates, "Failed to generate summary", err)
+				return
+			}
+
+			// Send the final response with the OpenAI-generated summary
+			send(updates, EventComplete, map[string]interface{}{
+				"message": summary,
+				"data":    data, // Include original data as well
+			})
 			return
 
-		case "ERROR":
+		case wildcard.EventError:
 			wildcardResp, err := p.wildcardClient.HandleResponse(resp)
 			if err != nil {
 				handleError(updates, "Failed to handle Wildcard error", err)
 				return
 			}
-			handleError(updates, "Wildcard error", fmt.Errorf("%v", wildcardResp.Error))
+			handleError(updates, wildcardResp.Error, nil)
 			return
 
 		default:

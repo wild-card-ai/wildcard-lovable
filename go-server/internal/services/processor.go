@@ -10,14 +10,17 @@ import (
 
 // Processor handles the processing of user messages
 type Processor struct {
-	wildcardClient *wildcard.StripeClient
+	wildcardClient *wildcard.Client
 	openaiService  *OpenAIService
 }
 
 // NewProcessor creates a new processor instance
 func NewProcessor(wildcardBaseURL string, stripeExecutor *stripe.Executor, openaiService *OpenAIService) *Processor {
+	client := wildcard.NewClient(wildcardBaseURL)
+	client.RegisterExecutor(wildcard.APINameStripe, stripeExecutor)
+
 	return &Processor{
-		wildcardClient: wildcard.NewStripeClient(wildcardBaseURL, stripeExecutor),
+		wildcardClient: client,
 		openaiService:  openaiService,
 	}
 }
@@ -40,5 +43,5 @@ func (p *Processor) ProcessMessage(userID, message string) (*wildcard.APIRespons
 	}
 
 	// If it is Stripe-related, use Wildcard to process it
-	return p.wildcardClient.ProcessStripeMessage(userID, message)
+	return p.wildcardClient.ProcessAPIMessage(userID, message)
 }
