@@ -21,15 +21,29 @@ import (
 
 // Executor handles Stripe API operations
 type Executor struct {
-	apiKey string
+	keyStore StripeKeyStoreInterface
+}
+
+// StripeKeyStoreInterface defines the interface for storing and retrieving Stripe API keys
+type StripeKeyStoreInterface interface {
+	GetStripeKey(userID string) (string, error)
 }
 
 // NewExecutor creates a new Stripe executor
-func NewExecutor(apiKey string) *Executor {
-	stripe.Key = apiKey
+func NewExecutor(keyStore StripeKeyStoreInterface) *Executor {
 	return &Executor{
-		apiKey: apiKey,
+		keyStore: keyStore,
 	}
+}
+
+// setStripeKey sets the Stripe API key for the current operation
+func (e *Executor) setStripeKey(userID string) error {
+	key, err := e.keyStore.GetStripeKey(userID)
+	if err != nil {
+		return fmt.Errorf("failed to get Stripe API key for user %s: %v", userID, err)
+	}
+	stripe.Key = key
+	return nil
 }
 
 // FunctionMap maps operation IDs to their corresponding functions
@@ -59,14 +73,18 @@ var FunctionMap = map[string]interface{}{
 }
 
 // ExecuteFunction executes a Stripe function by name with given arguments
-func (e *Executor) ExecuteFunction(name string, args map[string]interface{}) (interface{}, error) {
+func (e *Executor) ExecuteFunction(userID string, name string, args map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	fn, exists := FunctionMap[name]
 	if !exists {
 		return nil, fmt.Errorf("unknown function: %s", name)
 	}
 
-	method := fn.(func(*Executor, map[string]interface{}) (interface{}, error))
-	return method(e, args)
+	method := fn.(func(*Executor, string, map[string]interface{}) (interface{}, error))
+	return method(e, userID, args)
 }
 
 // convertToStripeParams converts a map[string]interface{} to a Stripe params struct using reflection
@@ -178,7 +196,7 @@ func convertToStripeParams(params map[string]interface{}, target interface{}) er
 	return nil
 }
 
-func (e *Executor) CreateCustomer(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) CreateCustomer(userID string, params map[string]interface{}) (interface{}, error) {
 	p := &stripe.CustomerParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -186,7 +204,7 @@ func (e *Executor) CreateCustomer(params map[string]interface{}) (interface{}, e
 	return customer.New(p)
 }
 
-func (e *Executor) ListCustomers(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) ListCustomers(userID string, params map[string]interface{}) (interface{}, error) {
 	p := &stripe.CustomerListParams{}
 	if limit, ok := params["limit"].(float64); ok {
 		p.Limit = stripe.Int64(int64(limit))
@@ -195,7 +213,11 @@ func (e *Executor) ListCustomers(params map[string]interface{}) (interface{}, er
 	return collectResults(i)
 }
 
-func (e *Executor) CreateProduct(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) CreateProduct(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.ProductParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -204,7 +226,11 @@ func (e *Executor) CreateProduct(params map[string]interface{}) (interface{}, er
 	return product.New(p)
 }
 
-func (e *Executor) ListProducts(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) ListProducts(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.ProductListParams{}
 	if active, ok := params["active"].(bool); ok {
 		p.Active = stripe.Bool(active)
@@ -213,7 +239,11 @@ func (e *Executor) ListProducts(params map[string]interface{}) (interface{}, err
 	return collectResults(i)
 }
 
-func (e *Executor) CreatePrice(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) CreatePrice(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.PriceParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -221,7 +251,11 @@ func (e *Executor) CreatePrice(params map[string]interface{}) (interface{}, erro
 	return price.New(p)
 }
 
-func (e *Executor) ListPrices(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) ListPrices(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.PriceListParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -230,7 +264,11 @@ func (e *Executor) ListPrices(params map[string]interface{}) (interface{}, error
 	return collectResults(i)
 }
 
-func (e *Executor) CreatePaymentLink(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) CreatePaymentLink(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.PaymentLinkParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -238,7 +276,11 @@ func (e *Executor) CreatePaymentLink(params map[string]interface{}) (interface{}
 	return paymentlink.New(p)
 }
 
-func (e *Executor) CreateInvoice(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) CreateInvoice(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.InvoiceParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -246,7 +288,11 @@ func (e *Executor) CreateInvoice(params map[string]interface{}) (interface{}, er
 	return invoice.New(p)
 }
 
-func (e *Executor) CreateInvoiceItem(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) CreateInvoiceItem(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.InvoiceItemParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -254,7 +300,11 @@ func (e *Executor) CreateInvoiceItem(params map[string]interface{}) (interface{}
 	return invoiceitem.New(p)
 }
 
-func (e *Executor) FinalizeInvoice(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) FinalizeInvoice(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	id, ok := params["invoice"].(string)
 	if !ok {
 		return nil, fmt.Errorf("invoice ID is required")
@@ -262,11 +312,19 @@ func (e *Executor) FinalizeInvoice(params map[string]interface{}) (interface{}, 
 	return invoice.FinalizeInvoice(id, nil)
 }
 
-func (e *Executor) GetBalance(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) GetBalance(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	return balance.Get(nil)
 }
 
-func (e *Executor) CreateRefund(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) CreateRefund(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.RefundParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -274,11 +332,17 @@ func (e *Executor) CreateRefund(params map[string]interface{}) (interface{}, err
 	return refund.New(p)
 }
 
-func (e *Executor) UpdateProduct(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) UpdateProduct(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	id, ok := params["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("product ID is required")
 	}
+	delete(params, "id")
+
 	p := &stripe.ProductParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -286,7 +350,11 @@ func (e *Executor) UpdateProduct(params map[string]interface{}) (interface{}, er
 	return product.Update(id, p)
 }
 
-func (e *Executor) GetProduct(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) GetProduct(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	id, ok := params["id"].(string)
 	if !ok {
 		return nil, fmt.Errorf("product ID is required")
@@ -294,7 +362,11 @@ func (e *Executor) GetProduct(params map[string]interface{}) (interface{}, error
 	return product.Get(id, nil)
 }
 
-func (e *Executor) CreateCheckoutSession(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) CreateCheckoutSession(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.CheckoutSessionParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -302,7 +374,11 @@ func (e *Executor) CreateCheckoutSession(params map[string]interface{}) (interfa
 	return checkoutsession.New(p)
 }
 
-func (e *Executor) CreateBillingPortalSession(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) CreateBillingPortalSession(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.BillingPortalSessionParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -310,7 +386,11 @@ func (e *Executor) CreateBillingPortalSession(params map[string]interface{}) (in
 	return portalsession.New(p)
 }
 
-func (e *Executor) GetPrice(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) GetPrice(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	id, ok := params["price"].(string)
 	if !ok {
 		return nil, fmt.Errorf("price ID is required")
@@ -318,11 +398,17 @@ func (e *Executor) GetPrice(params map[string]interface{}) (interface{}, error) 
 	return price.Get(id, nil)
 }
 
-func (e *Executor) UpdatePrice(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) UpdatePrice(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	id, ok := params["price"].(string)
 	if !ok {
 		return nil, fmt.Errorf("price ID is required")
 	}
+	delete(params, "price")
+
 	p := &stripe.PriceParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -330,16 +416,24 @@ func (e *Executor) UpdatePrice(params map[string]interface{}) (interface{}, erro
 	return price.Update(id, p)
 }
 
-func (e *Executor) SearchCustomers(params map[string]interface{}) (interface{}, error) {
-	p := &stripe.CustomerSearchParams{}
-	if err := convertToStripeParams(params, p); err != nil {
+func (e *Executor) SearchCustomers(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
 		return nil, err
+	}
+
+	p := &stripe.CustomerSearchParams{}
+	if query, ok := params["query"].(string); ok {
+		p.Query = query
 	}
 	i := customer.Search(p)
 	return collectResults(i)
 }
 
-func (e *Executor) GetCustomer(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) GetCustomer(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	id, ok := params["customer"].(string)
 	if !ok {
 		return nil, fmt.Errorf("customer ID is required")
@@ -347,7 +441,11 @@ func (e *Executor) GetCustomer(params map[string]interface{}) (interface{}, erro
 	return customer.Get(id, nil)
 }
 
-func (e *Executor) ListBillingPortalConfigurations(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) ListBillingPortalConfigurations(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.BillingPortalConfigurationListParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err
@@ -356,7 +454,11 @@ func (e *Executor) ListBillingPortalConfigurations(params map[string]interface{}
 	return collectResults(i)
 }
 
-func (e *Executor) CreateBillingPortalConfiguration(params map[string]interface{}) (interface{}, error) {
+func (e *Executor) CreateBillingPortalConfiguration(userID string, params map[string]interface{}) (interface{}, error) {
+	if err := e.setStripeKey(userID); err != nil {
+		return nil, err
+	}
+
 	p := &stripe.BillingPortalConfigurationParams{}
 	if err := convertToStripeParams(params, p); err != nil {
 		return nil, err

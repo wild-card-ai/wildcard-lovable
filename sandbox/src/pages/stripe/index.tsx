@@ -5,33 +5,33 @@ import { Chat } from '@/components/chat/Chat';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { useStripeKey } from '@/hooks/useStripeKey';
 
 export function StripeChatPage() {
   const navigate = useNavigate();
   const { sessionId } = useParams();
   const [apiKey, setApiKey] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isKeySet, setIsKeySet] = useState(false);
+  const { isSubmitting, isKeySet, registerStripeKey, checkExistingKey } = useStripeKey(sessionId!);
 
   useEffect(() => {
     if (!sessionId) {
       const newSessionId = uuidv4();
       navigate(`/stripe/${newSessionId}`);
     } else {
-      const storedApiKey = localStorage.getItem(`apiKey_${sessionId}`);
-      if (storedApiKey) {
-        setApiKey(storedApiKey);
-        setIsKeySet(true);
+      const existingKey = checkExistingKey();
+      if (existingKey) {
+        setApiKey(existingKey);
       }
     }
-  }, [sessionId, navigate]);
+  }, [sessionId, navigate, checkExistingKey]);
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    localStorage.setItem(`apiKey_${sessionId}`, apiKey);
-    setIsKeySet(true);
-    setIsSubmitting(false);
+    try {
+      await registerStripeKey(apiKey);
+    } catch (error) {
+      // Error is already handled in the hook
+    }
   };
 
   const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -56,7 +56,7 @@ export function StripeChatPage() {
               <div className="space-y-2">
                 <h2 className="text-xl font-semibold">Enter your Stripe API Key</h2>
                 <p className="text-sm text-muted-foreground">
-                  Your API key will be stored locally and never shared
+                  Your API key will be stored securely on the server
                 </p>
               </div>
               <div className="flex gap-2">

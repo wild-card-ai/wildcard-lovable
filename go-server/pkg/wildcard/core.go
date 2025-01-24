@@ -9,7 +9,7 @@ import (
 
 // Executor is the interface that all integration executors must implement
 type Executor interface {
-	ExecuteFunction(name string, arguments map[string]interface{}) (interface{}, error)
+	ExecuteFunction(userID string, name string, arguments map[string]interface{}) (interface{}, error)
 }
 
 // Client handles core Wildcard operations
@@ -101,7 +101,7 @@ func (c *Client) HandleResponse(resp *Response) (*APIResponse, error) {
 }
 
 // HandleExecEvent processes the EXEC event data into a Function and executes it
-func (c *Client) HandleExecEvent(data map[string]interface{}, apiName string) (*APIResponse, error) {
+func (c *Client) HandleExecEvent(userID string, data map[string]interface{}, apiName string) (*APIResponse, error) {
 	// Debug logging
 	fmt.Printf("HandleExecEvent received data: %+v\n", data)
 	fmt.Printf("HandleExecEvent received apiName: %s\n", apiName)
@@ -149,7 +149,7 @@ func (c *Client) HandleExecEvent(data map[string]interface{}, apiName string) (*
 	}
 
 	// Execute the function
-	result, err := executor.ExecuteFunction(function.Name, function.Arguments)
+	result, err := executor.ExecuteFunction(userID, function.Name, function.Arguments)
 	if err != nil {
 		return &APIResponse{
 			Success: false,
@@ -181,7 +181,7 @@ func (c *Client) ProcessAPIMessage(userID, message string) (*APIResponse, error)
 
 		// For EXEC events, execute the function and continue the conversation
 		if resp.Event == EventExec {
-			result, _ := c.HandleExecEvent(resp.Data, resp.API)
+			result, _ := c.HandleExecEvent(userID, resp.Data, resp.API)
 			if !result.Success {
 				// Send the error message back to continue the conversation
 				currentMessage = result.Error

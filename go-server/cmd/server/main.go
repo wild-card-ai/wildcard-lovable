@@ -15,21 +15,19 @@ func main() {
 	// Load configuration
 	cfg := config.NewConfig()
 
-	// Initialize Stripe executor
-	stripeExecutor := stripe.NewExecutor(cfg.StripeAPIKey)
-
-	// Initialize OpenAI service
+	// Initialize services
+	stripeStore := services.NewStripeKeyStore()
+	stripeExecutor := stripe.NewExecutor(stripeStore)
 	openaiService := services.NewOpenAIService(cfg.OpenAIAPIKey)
-
-	// Initialize processor
 	processor := services.NewProcessor(cfg.WildcardBackendURL, stripeExecutor, openaiService)
 
 	// Initialize handler
-	messageHandler := handlers.NewMessageHandler(processor)
+	messageHandler := handlers.NewMessageHandler(processor, stripeStore)
 
 	// Set up routes with CORS middleware
 	http.HandleFunc("/process", middleware.CorsMiddleware(messageHandler.ProcessMessage))
 	http.HandleFunc("/process-stream", middleware.CorsMiddleware(messageHandler.StreamProcess))
+	http.HandleFunc("/register-stripe", middleware.CorsMiddleware(messageHandler.HandleStripeRegistration))
 
 	// Start server
 	log.Printf("Starting server on port %s", cfg.Port)

@@ -1,11 +1,11 @@
 module github.com/wildcard-lovable/go-server
 
-go 1.23.4
+go 1.21
 
 require (
 	github.com/openai/openai-go v0.1.0-alpha.49
 	github.com/stretchr/testify v1.7.0
-	github.com/stripe/stripe-go/v81 v81.2.0
+	github.com/stripe/stripe-go/v81 v81.1.0
 )
 
 require (

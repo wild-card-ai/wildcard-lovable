@@ -90,7 +90,7 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 		switch resp.Event {
 		case wildcard.EventExec:
 			// Step 4: Execute the function since we have an available action
-			result, _ := p.wildcardClient.HandleExecEvent(resp.Data, resp.API)
+			result, _ := p.wildcardClient.HandleExecEvent(userID, resp.Data, resp.API)
 
 			if !result.Success {
 				handleError(updates, "Failed to execute function", fmt.Errorf("function execution failed"))

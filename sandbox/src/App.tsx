@@ -1,13 +1,16 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { StripeChatPage } from '@/pages/stripe';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { StripeChatPage } from './pages/stripe';
+import { Toaster } from './components/ui/toaster';
 
-export default function App() {
+function App() {
   return (
-    <BrowserRouter>
+    <Router>
       <Routes>
-        <Route path="/stripe/:sessionId" element={<StripeChatPage />} />
-        <Route path="*" element={<Navigate to={`/stripe/${crypto.randomUUID()}`} replace />} />
+        <Route path="/stripe/:sessionId?" element={<StripeChatPage />} />
       </Routes>
-    </BrowserRouter>
+      <Toaster />
+    </Router>
   );
 }
+
+export default App;

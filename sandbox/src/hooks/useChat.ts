@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { StreamEvent, ChatState, Message } from '../types/chat'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-const DELAY_BETWEEN_EVENTS = 1500
+const DELAY_BETWEEN_EVENTS = 500
 
 // Helper to add delay between state updates
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))

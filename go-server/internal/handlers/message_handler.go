@@ -11,13 +11,15 @@ import (
 
 // MessageHandler handles HTTP requests for message processing
 type MessageHandler struct {
-	processor *services.Processor
+	processor   *services.Processor
+	stripeStore *services.StripeKeyStore
 }
 
 // NewMessageHandler creates a new message handler
-func NewMessageHandler(processor *services.Processor) *MessageHandler {
+func NewMessageHandler(processor *services.Processor, stripeStore *services.StripeKeyStore) *MessageHandler {
 	return &MessageHandler{
-		processor: processor,
+		processor:   processor,
+		stripeStore: stripeStore,
 	}
 }
 
@@ -103,4 +105,25 @@ func sendSSEError(w http.ResponseWriter, msg string, err error) {
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+type StripeRegistrationRequest struct {
+	UserID string `json:"userId"`
+	APIKey string `json:"apiKey"`
+}
+
+func (h *MessageHandler) HandleStripeRegistration(w http.ResponseWriter, r *http.Request) {
+	var req StripeRegistrationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.stripeStore.RegisterKey(req.UserID, req.APIKey); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
