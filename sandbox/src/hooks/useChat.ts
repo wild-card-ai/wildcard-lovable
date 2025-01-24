@@ -56,14 +56,14 @@ export const useChat = (sessionId: string) => {
       } else {
         // When we hit a non-status message, process any accumulated status group
         if (currentStatusGroup.length > 0) {
-          if (currentStatusGroup.length > 3) {
+          if (currentStatusGroup.length > 2) {
             result.push({
               id: 'folded-indicator',
               type: 'status',
-              content: `${currentStatusGroup.length - 3} earlier steps`,
+              content: `${currentStatusGroup.length - 2} earlier steps`,
               timestamp: currentStatusGroup[0].timestamp
             })
-            result.push(...currentStatusGroup.slice(-3))
+            result.push(...currentStatusGroup.slice(-2))
           } else {
             result.push(...currentStatusGroup)
           }
@@ -75,14 +75,14 @@ export const useChat = (sessionId: string) => {
 
     // Handle any remaining status group at the end
     if (currentStatusGroup.length > 0) {
-      if (currentStatusGroup.length > 3) {
+      if (currentStatusGroup.length > 2) {
         result.push({
           id: 'folded-indicator',
           type: 'status',
-          content: `${currentStatusGroup.length - 3} earlier steps`,
+          content: `${currentStatusGroup.length - 2} earlier steps`,
           timestamp: currentStatusGroup[0].timestamp
         })
-        result.push(...currentStatusGroup.slice(-3))
+        result.push(...currentStatusGroup.slice(-2))
       } else {
         result.push(...currentStatusGroup)
       }
