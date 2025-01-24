@@ -1,6 +1,6 @@
 module github.com/wildcard-lovable/go-server
 
-go 1.23.5
+go 1.23.4
 
 require (
 	github.com/openai/openai-go v0.1.0-alpha.49
