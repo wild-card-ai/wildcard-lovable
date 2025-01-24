@@ -50,7 +50,7 @@ func (s *OpenAIService) GenerateSummary(ctx context.Context, summaryContext stri
 	resp, err := s.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: openai.F(openai.ChatModelGPT4o),
 		Messages: openai.F([]openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage("You are a helpful assistant. Generate a clear, concise summary of the Stripe actions that were taken. Focus on what was accomplished and any relevant details a user would want to know. Be friendly and professional."),
+			openai.SystemMessage("You are a helpful assistant. Generate a clear, concise summary of the Stripe actions that were taken. Focus on what was accomplished and any relevant details a user would want to know. Be friendly and professional. Briefly describe each of the steps taken as bullet points near the beginning"),
 			openai.UserMessage(summaryContext),
 		}),
 	})

@@ -73,8 +73,10 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 		return
 	}
 
-	// Step 3: Process with Wildcard to get the action to execute
+	// Add a slice to collect all messages and results
+	var actionResults []string
 	currentMessage := message
+
 	for {
 		send(updates, EventProgress, map[string]interface{}{
 			"message": "Processing with Wildcard",
@@ -110,6 +112,9 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 				currentMessage = fmt.Sprintf("Successfully executed function '%s'. Received Response: %s", resp.Data["name"], string(dataBytes))
 			}
 
+			// Store the result message
+			actionResults = append(actionResults, currentMessage)
+
 		case wildcard.EventStop:
 			wildcardResp, err := p.wildcardClient.HandleResponse(resp)
 			if handleError(updates, "Failed to handle Wildcard response", err) {
@@ -127,7 +132,11 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 			})
 
 			// Collect all relevant information for OpenAI
-			summaryContext := fmt.Sprintf("User request: %s\nAction results: %v", message, data)
+			summaryContext := fmt.Sprintf("User request: %s\n", message)
+			for i, result := range actionResults {
+				summaryContext += fmt.Sprintf("Action %d: %s\n", i+1, result)
+			}
+			summaryContext += fmt.Sprintf("Final results: %v", data)
 
 			// Get OpenAI to generate a user-friendly summary
 			summary, err := p.openaiService.GenerateSummary(context.Background(), summaryContext)
