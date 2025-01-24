@@ -12,13 +12,13 @@ To run the frontend, see [here](sandbox/README.md).
 
 This demo provides a testing environment for the following Stripe API operations:
 
-### Customer Management
+### Customers
 - stripe_post_customers: Create a customer
 - stripe_get_customers: List all customers
 - stripe_get_customers_search: Find customers by search
 - stripe_get_customers_customer: Get customer details
 
-### Product Management
+### Products
 - stripe_post_products: Create a product
 - stripe_get_products: List all products
 - stripe_post_products_id: Modify an existing product
@@ -36,16 +36,12 @@ This demo provides a testing environment for the following Stripe API operations
 - stripe_get_balance: Retrieve balance
 - stripe_post_refunds: Create a refund
 
-### Invoice Management
+### Invoices
 - stripe_post_invoices: Create an invoice
 - stripe_post_invoiceitems: Create an invoice item
 - stripe_post_invoices_invoice_finalize: Finalize an invoice
 
-### Customer Portal
+### Billing Portal
 - stripe_post_billing_portal_sessions: Create customer portal session
 - stripe_get_billing_portal_configurations: Get portal configurations list
 - stripe_post_billing_portal_configurations: Create new portal configuration
-
-## Contributing
-
-For questions or contributions, please open an issue or submit a pull request. 
