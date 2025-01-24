@@ -48,4 +48,4 @@ This demo provides a testing environment for the following Stripe API operations
 
 ## Contributing
 
-For questions or contributions, please open an issue or submit a pull request.
+For questions or contributions, please open an issue or submit a pull request. 
