@@ -33,7 +33,7 @@ func main() {
 
 	// Start server
 	log.Printf("Starting server on port %s", cfg.Port)
-	if err := http.ListenAndServe(":"+cfg.Port, nil); err != nil {
+	if err := http.ListenAndServe("0.0.0.0:"+cfg.Port, nil); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }
