@@ -8,14 +8,14 @@ const EXAMPLES: Example[] = [
     prompt: "For my SaaS product create a recurring pricing model with a basic, standard, and pro tier at $10, $50, and $300 per month"
   },
   {
-    label: "Get Checkout Link",
+    label: "Customer Count",
     description: "Stripe",
-    prompt: "Get a stripe checkout link for the standard tier so someone can buy the product"
+    prompt: "Add some dummy customer data and then look up how many customers I have"
   },
   {
     label: "Update Price",
     description: "Stripe",
-    prompt: "Change the price of the standard tier to $100/month"
+    prompt: "Create a product called 'Hamburger' at $100/month and then update the price to $150/month"
   },
   {
     label: "Create Single Product",
