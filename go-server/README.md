@@ -49,7 +49,7 @@ go mod download
 ## Running the Server
 
 ```bash
-go run cmd/server/main.go
+PORT=8080 go run cmd/server/main.go
 ```
 
 ## API Endpoints
@@ -93,7 +93,7 @@ Request body:
 
 Example curl request:
 ```bash
-curl -N -X POST http://localhost:8082/process-stream \
+curl -N -X POST http://localhost:8080/process-stream \
   -H "Content-Type: application/json" \
   -d '{
     "user_id": "user123",
