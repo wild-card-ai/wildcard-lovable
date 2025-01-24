@@ -99,7 +99,7 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 			}
 
 			send(updates, EventProgress, map[string]interface{}{
-				"message": "Function executed successfully",
+				"message": fmt.Sprintf("Ran %s successfully", resp.Data["name"]),
 				"result":  result.Data,
 			})
 

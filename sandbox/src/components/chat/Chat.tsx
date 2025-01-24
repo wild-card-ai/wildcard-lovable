@@ -70,7 +70,7 @@ export function Chat({ sessionId }: ChatProps) {
               )}
             </div>
           )}
-          {error && (
+          {error && error !== "function execution failed" && (
             <div className="p-4 rounded-md bg-red-500/10 text-red-600 border border-red-200/20">
               {error}
             </div>
