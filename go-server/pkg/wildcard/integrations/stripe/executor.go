@@ -2,6 +2,7 @@ package stripe
 
 import (
 	"fmt"
+
 	"github.com/stripe/stripe-go/v81"
 	"github.com/stripe/stripe-go/v81/balance"
 	portalconfig "github.com/stripe/stripe-go/v81/billingportal/configuration"
@@ -39,7 +40,7 @@ var FunctionMap = map[string]interface{}{
 	"stripe_get_prices":                         (*Executor).ListPrices,
 	"stripe_post_payment_links":                 (*Executor).CreatePaymentLink,
 	"stripe_post_invoices":                      (*Executor).CreateInvoice,
-	"stripe_post_invoiceitems":                 (*Executor).CreateInvoiceItem,
+	"stripe_post_invoiceitems":                  (*Executor).CreateInvoiceItem,
 	"stripe_post_invoices_invoice_finalize":     (*Executor).FinalizeInvoice,
 	"stripe_get_balance":                        (*Executor).GetBalance,
 	"stripe_post_refunds":                       (*Executor).CreateRefund,
@@ -363,4 +364,4 @@ func collectResults(i interface{}) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("unsupported iterator type")
 	}
-} 
+}

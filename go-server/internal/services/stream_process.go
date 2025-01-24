@@ -3,18 +3,20 @@ package services
 import (
 	"context"
 	"fmt"
+
 	"github.com/wildcard-lovable/go-server/internal/models"
+	"github.com/wildcard-lovable/go-server/pkg/wildcard"
 )
 
 // Event types for stream updates
 const (
-	EventStart     = "start"     // Initial event when processing starts
-	EventProgress  = "progress"  // Progress updates during processing
-	EventComplete  = "complete"  // Final success event
-	EventError     = "error"     // Error event
+	EventStart    = "start"    // Initial event when processing starts
+	EventProgress = "progress" // Progress updates during processing
+	EventComplete = "complete" // Final success event
+	EventError    = "error"    // Error event
 )
 
-// Helper functions 
+// Helper functions
 func send(updates chan<- models.StreamUpdate, eventType string, data map[string]interface{}) {
 	updates <- models.StreamUpdate{
 		Type: eventType,
@@ -65,7 +67,7 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 		"message": "Creating Wildcard session",
 	})
 
-	sessionID, err := p.createSession(userID)
+	sessionID, err := p.wildcardClient.CreateSession(userID)
 	if handleError(updates, "Failed to create session", err) {
 		return
 	}
@@ -77,7 +79,7 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 			"message": "Processing with Wildcard",
 		})
 
-		resp, err := p.processWithWildcard(userID, sessionID, currentMessage)
+		resp, err := p.wildcardClient.ProcessMessage(userID, sessionID, currentMessage)
 		if handleError(updates, "Failed to process with Wildcard", err) {
 			return
 		}
@@ -85,7 +87,7 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 		switch resp.Event {
 		case "EXEC":
 			// Step 4: Execute the Stripe function since we have an available action
-			result, err := p.handleExecEvent(resp.Data)
+			result, err := p.wildcardClient.(*wildcard.StripeClient).handleStripeExec(resp.Data)
 			if handleError(updates, "Failed to execute Stripe function", err) {
 				return
 			}
@@ -97,11 +99,20 @@ func (p *Processor) StreamProcessMessage(userID, message string, updates chan<- 
 			currentMessage = fmt.Sprintf("%v", result.Data)
 
 		case "STOP":
-			send(updates, EventComplete, resp.Data)
+			wildcardResp, err := p.wildcardClient.HandleResponse(resp)
+			if handleError(updates, "Failed to handle Wildcard response", err) {
+				return
+			}
+			send(updates, EventComplete, wildcardResp.Data)
 			return
 
 		case "ERROR":
-			handleError(updates, "Wildcard error", fmt.Errorf("%v", resp.Data))
+			wildcardResp, err := p.wildcardClient.HandleResponse(resp)
+			if err != nil {
+				handleError(updates, "Failed to handle Wildcard error", err)
+				return
+			}
+			handleError(updates, "Wildcard error", fmt.Errorf("%v", wildcardResp.Error))
 			return
 
 		default:
