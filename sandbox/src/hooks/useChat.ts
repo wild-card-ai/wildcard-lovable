@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
-import { StreamEvent, ChatState } from '../types/chat'
+import { StreamEvent, ChatState, Message } from '../types/chat'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8082'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 const DELAY_BETWEEN_EVENTS = 1500
 
 // Helper to add delay between state updates
@@ -31,8 +31,65 @@ export const useChat = (sessionId: string) => {
     messages: [],
     isProcessing: false,
     error: null,
-    status: null
+    status: [],
+    statusMessagesFolded: true
   })
+
+  const toggleStatusFold = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      statusMessagesFolded: !prev.statusMessagesFolded
+    }))
+  }, [])
+
+  // Filter status messages based on fold state
+  const getFilteredMessages = useCallback((messages: Message[]) => {
+    if (!state.statusMessagesFolded) return messages
+
+    // Find consecutive groups of status messages
+    const result: Message[] = []
+    let currentStatusGroup: Message[] = []
+    
+    for (const message of messages) {
+      if (message.type === 'status') {
+        currentStatusGroup.push(message)
+      } else {
+        // When we hit a non-status message, process any accumulated status group
+        if (currentStatusGroup.length > 0) {
+          if (currentStatusGroup.length > 2) {
+            result.push({
+              id: 'folded-indicator',
+              type: 'status',
+              content: `${currentStatusGroup.length - 2} earlier steps`,
+              timestamp: currentStatusGroup[0].timestamp
+            })
+            result.push(...currentStatusGroup.slice(-2))
+          } else {
+            result.push(...currentStatusGroup)
+          }
+          currentStatusGroup = []
+        }
+        result.push(message)
+      }
+    }
+
+    // Handle any remaining status group at the end
+    if (currentStatusGroup.length > 0) {
+      if (currentStatusGroup.length > 2) {
+        result.push({
+          id: 'folded-indicator',
+          type: 'status',
+          content: `${currentStatusGroup.length - 2} earlier steps`,
+          timestamp: currentStatusGroup[0].timestamp
+        })
+        result.push(...currentStatusGroup.slice(-2))
+      } else {
+        result.push(...currentStatusGroup)
+      }
+    }
+
+    return result
+  }, [state.statusMessagesFolded])
 
   // Handle a single event update
   const handleEventUpdate = useCallback(async (eventType: StreamEvent['type'], data: any) => {
@@ -44,7 +101,12 @@ export const useChat = (sessionId: string) => {
         case 'progress':
           return {
             ...prev,
-            status: data.message,
+            messages: [...prev.messages, {
+              id: uuidv4(),
+              type: 'status',
+              content: data.message,
+              timestamp: new Date()
+            }],
             error: null
           }
 
@@ -52,7 +114,7 @@ export const useChat = (sessionId: string) => {
           return {
             ...prev,
             error: data.error,
-            status: null
+            status: []
           }
 
         case 'complete':
@@ -60,8 +122,9 @@ export const useChat = (sessionId: string) => {
 
           return {
             ...prev,
-            status: null,
+            status: [],
             error: null,
+            isProcessing: false,
             messages: [...prev.messages, {
               id: uuidv4(),
               type: 'assistant',
@@ -97,14 +160,23 @@ export const useChat = (sessionId: string) => {
           if (!line.trim()) continue
           
           const event = parseSSELine(line)
-          if (event) {
+          if (event && event.data) {
             await handleEventUpdate(event.eventType, event.data)
           }
         }
       }
     } catch (e) {
       console.error('Error processing stream:', e)
+      // Handle stream disconnection error
+      setState(prev => ({
+        ...prev,
+        error: 'Connection lost. Please try again.',
+        status: [],
+        isProcessing: false
+      }))
       throw e
+    } finally {
+      reader.cancel() // Ensure reader is properly closed
     }
   }, [handleEventUpdate])
 
@@ -114,7 +186,7 @@ export const useChat = (sessionId: string) => {
       ...prev,
       isProcessing: true,
       error: null,
-      status: null,
+      status: [],
       messages: [...prev.messages, {
         id: uuidv4(),
         type: 'user',
@@ -127,7 +199,10 @@ export const useChat = (sessionId: string) => {
       const response = await fetch(`${API_URL}/process-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, sessionId })
+        body: JSON.stringify({ 
+          message: content, 
+          user_id: sessionId
+        })
       })
 
       if (!response.ok) throw new Error('Failed to process message')
@@ -136,17 +211,19 @@ export const useChat = (sessionId: string) => {
       setState(prev => ({
         ...prev,
         error: err instanceof Error ? err.message : 'An error occurred',
-        status: 'Failed to process message',
+        status: ['Failed to process message'],
         isProcessing: false
       }))
     }
   }, [processStream, sessionId])
 
   return {
-    messages: state.messages,
+    messages: getFilteredMessages(state.messages),
     isProcessing: state.isProcessing,
     error: state.error,
-    status: state.status,
-    sendMessage
+    status: state.status.join('\n\n'),
+    sendMessage,
+    toggleStatusFold,
+    statusMessagesFolded: state.statusMessagesFolded
   }
 } 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
 	"github.com/wildcard-lovable/go-server/internal/models"
 	"github.com/wildcard-lovable/go-server/internal/services"
 )
@@ -58,7 +59,6 @@ func (h *MessageHandler) StreamProcess(w http.ResponseWriter, r *http.Request) {
 
 	// Create a channel for updates
 	updates := make(chan models.StreamUpdate)
-	defer close(updates)
 
 	// Parse request
 	var req models.MessageRequest
@@ -103,4 +103,4 @@ func sendSSEError(w http.ResponseWriter, msg string, err error) {
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
-} 
+}

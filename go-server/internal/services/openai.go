@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 )
@@ -42,4 +43,25 @@ func (s *OpenAIService) InterpretMessage(ctx context.Context, message string) (b
 	}
 
 	return false, "", nil
-} 
+}
+
+// GenerateSummary generates a user-friendly summary of the actions taken
+func (s *OpenAIService) GenerateSummary(ctx context.Context, summaryContext string) (string, error) {
+	resp, err := s.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.F(openai.ChatModelGPT4o),
+		Messages: openai.F([]openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage("You are a helpful assistant. Generate a clear, concise summary of the Stripe actions that were taken. Focus on what was accomplished and any relevant details a user would want to know. Be friendly and professional. Briefly describe each of the steps taken as bullet points near the beginning"),
+			openai.UserMessage(summaryContext),
+		}),
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("failed to generate summary: %w", err)
+	}
+
+	if len(resp.Choices) > 0 {
+		return resp.Choices[0].Message.Content, nil
+	}
+
+	return "", fmt.Errorf("no summary generated")
+}

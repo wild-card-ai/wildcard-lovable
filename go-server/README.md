@@ -46,25 +46,6 @@ export STRIPE_API_KEY=your_stripe_api_key        # Stripe API key
 go mod download
 ```
 
-## Running Tests
-
-1. Update dependencies and ensure test packages are installed:
-```bash
-go mod tidy
-```
-
-2. Run all tests:
-```bash
-go test ./... -v
-```
-
-3. Run tests for a specific package:
-```bash
-go test ./internal/services -v  # Run only services tests
-```
-
-Note: Some tests require environment variables (like `STRIPE_API_KEY`) to be set for integration testing.
-
 ## Running the Server
 
 ```bash

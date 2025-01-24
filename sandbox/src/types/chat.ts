@@ -18,7 +18,8 @@ export type ChatState = {
   messages: Message[]
   isProcessing: boolean
   error: string | null
-  status: string | null
+  status: string[]
+  statusMessagesFolded: boolean
 }
 
 export type Example = {

@@ -2,6 +2,9 @@ package stripe
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
+
 	"github.com/stripe/stripe-go/v81"
 	"github.com/stripe/stripe-go/v81/balance"
 	portalconfig "github.com/stripe/stripe-go/v81/billingportal/configuration"
@@ -39,7 +42,7 @@ var FunctionMap = map[string]interface{}{
 	"stripe_get_prices":                         (*Executor).ListPrices,
 	"stripe_post_payment_links":                 (*Executor).CreatePaymentLink,
 	"stripe_post_invoices":                      (*Executor).CreateInvoice,
-	"stripe_post_invoiceitems":                 (*Executor).CreateInvoiceItem,
+	"stripe_post_invoiceitems":                  (*Executor).CreateInvoiceItem,
 	"stripe_post_invoices_invoice_finalize":     (*Executor).FinalizeInvoice,
 	"stripe_get_balance":                        (*Executor).GetBalance,
 	"stripe_post_refunds":                       (*Executor).CreateRefund,
@@ -66,16 +69,119 @@ func (e *Executor) ExecuteFunction(name string, args map[string]interface{}) (in
 	return method(e, args)
 }
 
+// convertToStripeParams converts a map[string]interface{} to a Stripe params struct using reflection
+func convertToStripeParams(params map[string]interface{}, target interface{}) error {
+	targetValue := reflect.ValueOf(target).Elem()
+	targetType := targetValue.Type()
+
+	// Handle metadata if it exists
+	if metadata, ok := params["metadata"].(map[string]interface{}); ok {
+		if method := targetValue.MethodByName("AddMetadata"); method.IsValid() {
+			for k, v := range metadata {
+				if strVal, ok := v.(string); ok {
+					method.Call([]reflect.Value{
+						reflect.ValueOf(k),
+						reflect.ValueOf(strVal),
+					})
+				}
+			}
+		}
+	}
+
+	// Handle expand fields if they exist
+	if expand, ok := params["expand"].([]interface{}); ok {
+		if method := targetValue.MethodByName("AddExpand"); method.IsValid() {
+			for _, e := range expand {
+				if strVal, ok := e.(string); ok {
+					method.Call([]reflect.Value{reflect.ValueOf(strVal)})
+				}
+			}
+		}
+	}
+
+	for i := 0; i < targetType.NumField(); i++ {
+		field := targetType.Field(i)
+		formTag := field.Tag.Get("form")
+		if formTag == "" {
+			continue
+		}
+		formName := strings.Split(formTag, ",")[0]
+		if formName == "*" || formName == "-" {
+			continue
+		}
+
+		if value, ok := params[formName]; ok && value != nil {
+			fieldValue := targetValue.Field(i)
+			if !fieldValue.CanSet() {
+				continue
+			}
+
+			switch fieldValue.Type().String() {
+			case "*string":
+				if strVal, ok := value.(string); ok {
+					fieldValue.Set(reflect.ValueOf(stripe.String(strVal)))
+				}
+			case "*int64":
+				switch v := value.(type) {
+				case float64:
+					fieldValue.Set(reflect.ValueOf(stripe.Int64(int64(v))))
+				case int:
+					fieldValue.Set(reflect.ValueOf(stripe.Int64(int64(v))))
+				}
+			case "*bool":
+				if boolVal, ok := value.(bool); ok {
+					fieldValue.Set(reflect.ValueOf(stripe.Bool(boolVal)))
+				}
+			case "[]*string":
+				if arr, ok := value.([]interface{}); ok {
+					strArr := make([]*string, len(arr))
+					for i, v := range arr {
+						if strVal, ok := v.(string); ok {
+							strArr[i] = stripe.String(strVal)
+						}
+					}
+					fieldValue.Set(reflect.ValueOf(strArr))
+				}
+			case "map[string]string":
+				if mapVal, ok := value.(map[string]interface{}); ok {
+					strMap := make(map[string]string)
+					for k, v := range mapVal {
+						if strVal, ok := v.(string); ok {
+							strMap[k] = strVal
+						}
+					}
+					fieldValue.Set(reflect.ValueOf(strMap))
+				}
+			default:
+				// Handle nested structs
+				if fieldValue.Kind() == reflect.Ptr {
+					if nestedMap, ok := value.(map[string]interface{}); ok {
+						nestedType := fieldValue.Type().Elem()
+						nestedValue := reflect.New(nestedType)
+						if err := convertToStripeParams(nestedMap, nestedValue.Interface()); err != nil {
+							return err
+						}
+						fieldValue.Set(nestedValue)
+					}
+				} else if fieldValue.Kind() == reflect.Struct {
+					if nestedMap, ok := value.(map[string]interface{}); ok {
+						nestedValue := reflect.New(fieldValue.Type())
+						if err := convertToStripeParams(nestedMap, nestedValue.Interface()); err != nil {
+							return err
+						}
+						fieldValue.Set(nestedValue.Elem())
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (e *Executor) CreateCustomer(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.CustomerParams{}
-	if email, ok := params["email"].(string); ok {
-		p.Email = stripe.String(email)
-	}
-	if name, ok := params["name"].(string); ok {
-		p.Name = stripe.String(name)
-	}
-	if description, ok := params["description"].(string); ok {
-		p.Description = stripe.String(description)
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return customer.New(p)
 }
@@ -91,15 +197,10 @@ func (e *Executor) ListCustomers(params map[string]interface{}) (interface{}, er
 
 func (e *Executor) CreateProduct(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.ProductParams{}
-	if name, ok := params["name"].(string); ok {
-		p.Name = stripe.String(name)
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
-	if description, ok := params["description"].(string); ok {
-		p.Description = stripe.String(description)
-	}
-	if active, ok := params["active"].(bool); ok {
-		p.Active = stripe.Bool(active)
-	}
+	fmt.Printf("Product params: %+v\n", p)
 	return product.New(p)
 }
 
@@ -114,22 +215,16 @@ func (e *Executor) ListProducts(params map[string]interface{}) (interface{}, err
 
 func (e *Executor) CreatePrice(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.PriceParams{}
-	if currency, ok := params["currency"].(string); ok {
-		p.Currency = stripe.String(currency)
-	}
-	if productID, ok := params["product"].(string); ok {
-		p.Product = stripe.String(productID)
-	}
-	if unitAmount, ok := params["unit_amount"].(float64); ok {
-		p.UnitAmount = stripe.Int64(int64(unitAmount))
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return price.New(p)
 }
 
 func (e *Executor) ListPrices(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.PriceListParams{}
-	if active, ok := params["active"].(bool); ok {
-		p.Active = stripe.Bool(active)
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	i := price.List(p)
 	return collectResults(i)
@@ -137,45 +232,24 @@ func (e *Executor) ListPrices(params map[string]interface{}) (interface{}, error
 
 func (e *Executor) CreatePaymentLink(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.PaymentLinkParams{}
-	if lineItems, ok := params["line_items"].([]interface{}); ok {
-		p.LineItems = make([]*stripe.PaymentLinkLineItemParams, len(lineItems))
-		for i, item := range lineItems {
-			if itemMap, ok := item.(map[string]interface{}); ok {
-				lineItem := &stripe.PaymentLinkLineItemParams{}
-				if price, ok := itemMap["price"].(string); ok {
-					lineItem.Price = stripe.String(price)
-				}
-				if quantity, ok := itemMap["quantity"].(float64); ok {
-					lineItem.Quantity = stripe.Int64(int64(quantity))
-				}
-				p.LineItems[i] = lineItem
-			}
-		}
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return paymentlink.New(p)
 }
 
 func (e *Executor) CreateInvoice(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.InvoiceParams{}
-	if customerID, ok := params["customer"].(string); ok {
-		p.Customer = stripe.String(customerID)
-	}
-	if collectionMethod, ok := params["collection_method"].(string); ok {
-		p.CollectionMethod = stripe.String(collectionMethod)
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return invoice.New(p)
 }
 
 func (e *Executor) CreateInvoiceItem(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.InvoiceItemParams{}
-	if customerID, ok := params["customer"].(string); ok {
-		p.Customer = stripe.String(customerID)
-	}
-	if amount, ok := params["amount"].(float64); ok {
-		p.Amount = stripe.Int64(int64(amount))
-	}
-	if currency, ok := params["currency"].(string); ok {
-		p.Currency = stripe.String(currency)
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return invoiceitem.New(p)
 }
@@ -194,11 +268,8 @@ func (e *Executor) GetBalance(params map[string]interface{}) (interface{}, error
 
 func (e *Executor) CreateRefund(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.RefundParams{}
-	if charge, ok := params["charge"].(string); ok {
-		p.Charge = stripe.String(charge)
-	}
-	if amount, ok := params["amount"].(float64); ok {
-		p.Amount = stripe.Int64(int64(amount))
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return refund.New(p)
 }
@@ -209,11 +280,8 @@ func (e *Executor) UpdateProduct(params map[string]interface{}) (interface{}, er
 		return nil, fmt.Errorf("product ID is required")
 	}
 	p := &stripe.ProductParams{}
-	if name, ok := params["name"].(string); ok {
-		p.Name = stripe.String(name)
-	}
-	if description, ok := params["description"].(string); ok {
-		p.Description = stripe.String(description)
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return product.Update(id, p)
 }
@@ -228,40 +296,16 @@ func (e *Executor) GetProduct(params map[string]interface{}) (interface{}, error
 
 func (e *Executor) CreateCheckoutSession(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.CheckoutSessionParams{}
-	if mode, ok := params["mode"].(string); ok {
-		p.Mode = stripe.String(mode)
-	}
-	if successURL, ok := params["success_url"].(string); ok {
-		p.SuccessURL = stripe.String(successURL)
-	}
-	if cancelURL, ok := params["cancel_url"].(string); ok {
-		p.CancelURL = stripe.String(cancelURL)
-	}
-	if lineItems, ok := params["line_items"].([]interface{}); ok {
-		p.LineItems = make([]*stripe.CheckoutSessionLineItemParams, len(lineItems))
-		for i, item := range lineItems {
-			if itemMap, ok := item.(map[string]interface{}); ok {
-				lineItem := &stripe.CheckoutSessionLineItemParams{}
-				if price, ok := itemMap["price"].(string); ok {
-					lineItem.Price = stripe.String(price)
-				}
-				if quantity, ok := itemMap["quantity"].(float64); ok {
-					lineItem.Quantity = stripe.Int64(int64(quantity))
-				}
-				p.LineItems[i] = lineItem
-			}
-		}
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return checkoutsession.New(p)
 }
 
 func (e *Executor) CreateBillingPortalSession(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.BillingPortalSessionParams{}
-	if customerID, ok := params["customer"].(string); ok {
-		p.Customer = stripe.String(customerID)
-	}
-	if returnURL, ok := params["return_url"].(string); ok {
-		p.ReturnURL = stripe.String(returnURL)
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return portalsession.New(p)
 }
@@ -280,19 +324,16 @@ func (e *Executor) UpdatePrice(params map[string]interface{}) (interface{}, erro
 		return nil, fmt.Errorf("price ID is required")
 	}
 	p := &stripe.PriceParams{}
-	if active, ok := params["active"].(bool); ok {
-		p.Active = stripe.Bool(active)
-	}
-	if nickname, ok := params["nickname"].(string); ok {
-		p.Nickname = stripe.String(nickname)
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return price.Update(id, p)
 }
 
 func (e *Executor) SearchCustomers(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.CustomerSearchParams{}
-	if query, ok := params["query"].(string); ok {
-		p.Query = query
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	i := customer.Search(p)
 	return collectResults(i)
@@ -308,8 +349,8 @@ func (e *Executor) GetCustomer(params map[string]interface{}) (interface{}, erro
 
 func (e *Executor) ListBillingPortalConfigurations(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.BillingPortalConfigurationListParams{}
-	if active, ok := params["active"].(bool); ok {
-		p.Active = stripe.Bool(active)
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	i := portalconfig.List(p)
 	return collectResults(i)
@@ -317,14 +358,8 @@ func (e *Executor) ListBillingPortalConfigurations(params map[string]interface{}
 
 func (e *Executor) CreateBillingPortalConfiguration(params map[string]interface{}) (interface{}, error) {
 	p := &stripe.BillingPortalConfigurationParams{}
-	if businessProfile, ok := params["business_profile"].(map[string]interface{}); ok {
-		p.BusinessProfile = &stripe.BillingPortalConfigurationBusinessProfileParams{}
-		if privacyURL, ok := businessProfile["privacy_policy_url"].(string); ok {
-			p.BusinessProfile.PrivacyPolicyURL = stripe.String(privacyURL)
-		}
-		if tosURL, ok := businessProfile["terms_of_service_url"].(string); ok {
-			p.BusinessProfile.TermsOfServiceURL = stripe.String(tosURL)
-		}
+	if err := convertToStripeParams(params, p); err != nil {
+		return nil, err
 	}
 	return portalconfig.New(p)
 }
@@ -363,4 +398,4 @@ func collectResults(i interface{}) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("unsupported iterator type")
 	}
-} 
+}
