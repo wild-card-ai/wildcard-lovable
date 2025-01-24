@@ -32,6 +32,8 @@ func (p *Processor) ProcessMessage(userID, message string) (*models.APIResponse,
 
 	// First, interpret the message using OpenAI to determine if it's Stripe-related
 	isStripeRelated, llmResponse, err := p.openaiService.InterpretMessage(ctx, message)
+	// Print the result for debugging purposes
+	fmt.Printf("Message interpretation result - isStripeRelated: %v, response: %v\n", isStripeRelated, llmResponse)
 	if err != nil {
 		return nil, fmt.Errorf("failed to interpret message: %w", err)
 	}
@@ -137,7 +139,7 @@ func (p *Processor) handleWildcardResponse(resp *models.WildcardResponse) (*mode
 
 // handleExecEvent processes the EXEC event and executes the appropriate Stripe function
 func (p *Processor) handleExecEvent(data map[string]interface{}) (*models.APIResponse, error) {
-	var function models.OpenAIFunction
+	var function models.WildcardFunction
 	functionData, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -159,4 +161,4 @@ func (p *Processor) handleExecEvent(data map[string]interface{}) (*models.APIRes
 		Success: true,
 		Data:    result,
 	}, nil
-} 
+}

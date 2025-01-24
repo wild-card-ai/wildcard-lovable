@@ -17,8 +17,8 @@ type WildcardResponse struct {
 	Data  map[string]interface{} `json:"data"`
 }
 
-// OpenAIFunction represents a function call from OpenAI
-type OpenAIFunction struct {
+// WildcardFunction represents a function call from Wildcard
+type WildcardFunction struct {
 	Name      string                 `json:"name"`
 	Arguments map[string]interface{} `json:"arguments"`
 }
@@ -28,4 +28,10 @@ type APIResponse struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`
 	Error   string     `json:"error,omitempty"`
+}
+
+// StreamUpdate represents a single update in the SSE stream
+type StreamUpdate struct {
+	Type string                 `json:"type"` // "start", "processing", "exec", "result", "error", "complete"
+	Data map[string]interface{} `json:"data"`
 } 

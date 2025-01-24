@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"github.com/wildcard-lovable/go-server/internal/config"
 	"github.com/wildcard-lovable/go-server/internal/handlers"
+	"github.com/wildcard-lovable/go-server/internal/middleware"
 	"github.com/wildcard-lovable/go-server/internal/services"
 	"github.com/wildcard-lovable/go-server/pkg/stripe"
 )
@@ -25,8 +26,9 @@ func main() {
 	// Initialize handler
 	messageHandler := handlers.NewMessageHandler(processor)
 
-	// Set up routes
-	http.HandleFunc("/process", messageHandler.ProcessMessage)
+	// Set up routes with CORS middleware
+	http.HandleFunc("/process", middleware.CorsMiddleware(messageHandler.ProcessMessage))
+	http.HandleFunc("/process-stream", middleware.CorsMiddleware(messageHandler.StreamProcess))
 
 	// Start server
 	log.Printf("Starting server on port %s", cfg.Port)
