@@ -14,7 +14,7 @@ type Config struct {
 
 func NewConfig() *Config {
 	return &Config{
-		Port:              getEnvOrDefault("PORT", "8080"),
+		Port:              getEnvOrDefault("PORT", "8002"),
 		WildcardBackendURL: getEnvOrDefault("WILDCARD_BACKEND_URL", "http://localhost:8000"),
 		OpenAIAPIKey:      getEnv("OPENAI_API_KEY"),
 		StripeAPIKey:      getEnv("STRIPE_API_KEY"),
