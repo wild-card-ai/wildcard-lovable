@@ -44,4 +44,4 @@ This demo provides a testing environment for the following Stripe API operations
 ### Billing Portal
 - stripe_post_billing_portal_sessions: Create customer portal session
 - stripe_get_billing_portal_configurations: Get portal configurations list
-- stripe_post_billing_portal_configurations: Create new portal configuration
+- stripe_post_billing_portal_configurations: Create new portal configuration 
